@@ -10,10 +10,18 @@
     },
     "devDependencies": {
         "@types/node": "^20.10.1",
-        "nktj_cli": "^1.0.2"
+        "nktj_cli": "^1.0.2",
+        "mime-types": "^2.1.35",
+        "uglify-js": "^3.18.0",
+        "javascript-obfuscator": "^4.1.1",
+        "strip-comments": "^2.0.1"
     },
     "dependencies": {
         "@types/node": "^20.10.1",
-        "nktj_cli": "^1.0.2"
+        "nktj_cli": "^1.0.2",
+        "mime-types": "^2.1.35",
+        "uglify-js": "^3.18.0",
+        "javascript-obfuscator": "^4.1.1",
+        "strip-comments": "^2.0.1"
     }
 }
