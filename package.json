@@ -8,9 +8,6 @@
         "type": "git",
         "url": "git+https://github.com/masatonakatsuji2021/mikeneko-build.git"
     },
-    "scripts": {
-        "build.android": "node . --platform app && cd output/app && cordova run android"
-    },
     "devDependencies": {
         "@types/node": "^20.10.1",
         "nktj_cli": "^1.0.2"
