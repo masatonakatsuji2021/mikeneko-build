@@ -419,20 +419,15 @@ class Builder {
             const libPath = rootDir + "/node_modules/mikeneko-corelib";
             const binPath = libPath + "/bin";
             const distPath = libPath + "/dist";
-            const distTsTypePath = distPath + "/" + tsType;
             const outPath = rootDir + "/dist/corelib";
             if (!corelibtsc) {
                 if (fs.existsSync(outPath))
                     return;
             }
-            if (!fs.existsSync(distPath))
-                fs.mkdirSync(distPath);
-            if (!fs.existsSync(distTsTypePath))
-                fs.mkdirSync(distTsTypePath);
             let forceStr = "";
             nktj_cli_1.CLI.wait(nktj_cli_1.CLI.setColor("# ", nktj_cli_1.Color.Green) + forceStr + "TranceComplie (Core Library) ...");
             return new Promise((resolve, reject) => {
-                this.corelibDelete(distTsTypePath);
+                this.corelibDelete(outPath);
                 (0, child_process_1.exec)("cd " + binPath + " && tsc --outdir " + outPath + " --project tsconfigs/" + tsType + ".json", (error, stdout, stderr) => {
                     if (error) {
                         nktj_cli_1.CLI.waitClose(nktj_cli_1.CLI.setColor("NG", nktj_cli_1.Color.Red));

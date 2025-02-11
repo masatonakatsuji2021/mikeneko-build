@@ -441,18 +441,15 @@ export class Builder {
         const libPath = rootDir + "/node_modules/mikeneko-corelib";
         const binPath = libPath + "/bin";
         const distPath = libPath + "/dist";
-        const distTsTypePath = distPath + "/" + tsType;
         const outPath = rootDir + "/dist/corelib";
         if (!corelibtsc) {
             if (fs.existsSync(outPath)) return;
         }
-        if (!fs.existsSync(distPath)) fs.mkdirSync(distPath);        
-        if (!fs.existsSync(distTsTypePath)) fs.mkdirSync(distTsTypePath);
         let forceStr = "";
         CLI.wait(CLI.setColor("# ", Color.Green) + forceStr + "TranceComplie (Core Library) ...");
 
         return new Promise((resolve, reject) => {
-            this.corelibDelete(distTsTypePath);
+            this.corelibDelete(outPath);
             exec("cd " + binPath + " && tsc --outdir " + outPath + " --project tsconfigs/" + tsType + ".json",(error, stdout, stderr)=>{
                 if (error) {
                     CLI.waitClose(CLI.setColor("NG", Color.Red));
