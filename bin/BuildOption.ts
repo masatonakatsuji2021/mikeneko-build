@@ -70,49 +70,19 @@ export interface BuildPlatform {
      * ***mapping*** : Enable source mapping with browsers like Chrome.
      */
     mapping?: boolean,
+
 }
 
 export interface BuildOption {
 
     /**
-     * ***debug*** : debug mode.
-     */
-    debug? : boolean,
-
-    /**
-     * ***rootDir*** : Root Directory.
-     */
-    rootDir? : string,
-
-    /**
      * ***platforms*** : Platform specific settings.
      */
     platforms? :  Array<BuildPlatform>,
-
+    
     /**
-     * ***codeCompress*** : code compress.
+     * ***plugins*** : A list of plugin packages to use.  
+     * The specified plugin's npm package must be installed.
      */
-    codeCompress? : boolean,
-
-    /**
-     * ***tranceComplied*** : Tyepscript trance complie.
-     */
-    tranceComplied? : boolean,
-
-    /**
-     * ***tscType*** : Specify the TypeScript transpilation type.  
-     * If not specified, it will be transpiled to ES6 by default.
-     */
-    tscType? : string,
-
-    /**
-     * ***corelibtsc*** : Force transpilation of core libraries.  
-     * Used to update transpiled files when the core library is updated.
-     */
-    corelibtsc?: boolean,
-
-    /**
-     * ***obfuscated*** : javascript obfuscate.
-     */
-    obfuscated? : boolean,
+    plugins?: Array<string>,
 }

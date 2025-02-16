@@ -46,21 +46,15 @@ class Builder {
                     }
                 }
             }
-            if (argsOption["corelibtsc"]) {
-                option.corelibtsc = true;
-            }
+            let corelibTsc = false;
+            if (argsOption["corelibtsc"])
+                corelibTsc = true;
             if (!option)
                 option = {};
-            if (option.debug == undefined)
-                option.debug = false;
-            if (option.rootDir == undefined)
-                option.rootDir = process.cwd();
-            if (option.tranceComplied == undefined)
-                option.tranceComplied = true;
             if (option.platforms == undefined)
                 option.platforms = [{ name: "web" }];
             nktj_cli_1.CLI.outn("** mikeneko build start **");
-            const rootDir = option.rootDir;
+            const rootDir = process.cwd();
             if (!fs.existsSync(rootDir + "/node_modules/mikeneko-corelib/package.json")) {
                 try {
                     yield this.installCoreLib(rootDir);
@@ -71,33 +65,62 @@ class Builder {
                     return;
                 }
             }
-            const CoreLibList = require(rootDir + "/node_modules/mikeneko-corelib/list.json");
+            let CoreLibList = require(rootDir + "/node_modules/mikeneko-corelib/list.json");
+            // plugin library add
+            let pluginList = [];
+            if (option.plugins) {
+                for (let n = 0; n < option.plugins.length; n++) {
+                    const libname = option.plugins[n];
+                    if (fs.existsSync(rootDir + "/node_modules/" + libname + "/package.json") &&
+                        fs.existsSync(rootDir + "/node_modules/" + libname + "/list.json")) {
+                        pluginList.push({
+                            libname: libname,
+                            list: require(rootDir + "/node_modules/" + libname + "/list.json"),
+                        });
+                    }
+                    else {
+                        nktj_cli_1.CLI.outn(nktj_cli_1.CLI.setColor("# [WARM] Unable to find package \"" + libname + "\" as plugin.", nktj_cli_1.Color.Orange));
+                    }
+                }
+            }
             // typescript trance complie
             let tsType = "es6";
             const tsType_ = this.getTsType(rootDir);
             if (tsType_)
                 tsType = tsType_;
-            option.tscType = tsType;
             nktj_cli_1.CLI.setIndent(4).br();
             let platformText = platformnames.join(", ");
             if (selectPlatform)
                 platformText = selectPlatform;
             nktj_cli_1.CLI.outData({
                 "TypeSCript Type": tsType,
-                "corelibtsc": Boolean(option.corelibtsc),
+                "corelibtsc": corelibTsc,
                 "root": rootDir,
                 "platform": platformText,
             });
             nktj_cli_1.CLI.br().setIndent(0);
             // trancecomplie in core library trancecomplie on select type 
             try {
-                yield this.typescriptComplieCoreLib(rootDir, tsType, option.corelibtsc);
+                yield this.typescriptComplieCoreLib(rootDir, tsType, corelibTsc);
             }
             catch (error) {
                 nktj_cli_1.CLI.outn("[TypeScript TrancePlie CoreLib Error]", nktj_cli_1.Color.Red);
                 nktj_cli_1.CLI.outn(error);
                 nktj_cli_1.CLI.outn("...... " + nktj_cli_1.CLI.setColor("Failed!", nktj_cli_1.Color.Red));
                 return;
+            }
+            // trancecomplie in plugin
+            for (let n = 0; n < pluginList.length; n++) {
+                const lib = pluginList[n];
+                try {
+                    yield this.typescriptCompliePlugin(rootDir, tsType, corelibTsc, lib);
+                }
+                catch (error) {
+                    nktj_cli_1.CLI.outn("[TypeScript TrancePlie Plugin Error (" + lib.libname + ")]", nktj_cli_1.Color.Red);
+                    nktj_cli_1.CLI.outn(error);
+                    nktj_cli_1.CLI.outn("...... " + nktj_cli_1.CLI.setColor("Failed!", nktj_cli_1.Color.Red));
+                    return;
+                }
             }
             // trancecomplie in local content
             try {
@@ -155,7 +178,7 @@ class Builder {
                 if (platform.optionDir)
                     platformDir += "/" + platform.optionDir;
                 if (platform.build == BuildOption_1.BuildType.webpack) {
-                    this.buildWebPack(rootDir, platformDir, option.tscType, platform, CoreLibList, platformOptionClass, buildhandle);
+                    this.buildWebPack(rootDir, platformDir, tsType, platform, CoreLibList, pluginList, platformOptionClass, buildhandle);
                     return;
                 }
                 this.outMkdir(platformDir, true);
@@ -166,7 +189,7 @@ class Builder {
                 // code set
                 let codeList = {};
                 // start head
-                let debug = option.debug;
+                let debug = false;
                 if (platform.debug != undefined)
                     debug = platform.debug;
                 this.jsStart(rootDir, codeList, tsType, platform.name, debug);
@@ -174,6 +197,10 @@ class Builder {
                 CoreLibList.forEach((core) => {
                     // core module mount
                     this.coreModuleMount(rootDir, codeList, tsType, core, platform);
+                });
+                // plugin module mount
+                pluginList.forEach(lib => {
+                    this.pluginModuleMount(rootDir, codeList, tsType, lib, platform);
                 });
                 if (platformOptionClass) {
                     const addModule = (name, modulePath) => {
@@ -189,6 +216,10 @@ class Builder {
                 }
                 // core resource mount
                 this.coreResourceMount(rootDir, codeList, platform);
+                // plugin resource mount
+                pluginList.forEach(lib => {
+                    this.pluginResourceMount(rootDir, codeList, lib, platform);
+                });
                 // local module mount
                 this.localModuleMount(codeList, rootDir, platform.name, platform);
                 // rendering html mount
@@ -199,13 +230,13 @@ class Builder {
                 this.jsEnd(codeList, platform);
                 let coreStr = Object.values(codeList).join("");
                 // code compress
-                let codeCompress = option.codeCompress;
+                let codeCompress = false;
                 if (platform.codeCompress != undefined)
                     codeCompress = platform.codeCompress;
                 if (codeCompress)
                     coreStr = this.codeCompress(coreStr);
                 // code obfuscated
-                let obfuscated = option.obfuscated;
+                let obfuscated = false;
                 if (platform.obfuscated != undefined)
                     obfuscated = platform.obfuscated;
                 if (obfuscated)
@@ -291,6 +322,16 @@ class Builder {
         contents = "var exports = {};\n" + contents + ";\nreturn exports;";
         codeList[name] = this.setFn(name, contents, true, platform);
     }
+    static pluginModuleMount(rootDir, codeList, tsType, lib, platform) {
+        for (let n = 0; n < lib.list.length; n++) {
+            const moduleName = lib.list[n];
+            const modulePath = rootDir + "/dist/plugins/" + lib.libname + "/" + moduleName + ".js";
+            nktj_cli_1.CLI.outn(nktj_cli_1.CLI.setColor("# ", nktj_cli_1.Color.Green) + "mount plugin".padEnd(20) + " " + moduleName);
+            let contents = fs.readFileSync(modulePath).toString();
+            contents = "var exports = {};\n" + contents + ";\nreturn exports;";
+            codeList[lib.libname] = this.setFn(moduleName, contents, true, platform);
+        }
+    }
     static coreResourceMount(rootDir, codeList, platform) {
         const targetPath = rootDir + "/node_modules/mikeneko-corelib/bin/res";
         this.search(targetPath, (file) => {
@@ -301,6 +342,18 @@ class Builder {
             const contentB64 = Buffer.from(fs.readFileSync(fullPath)).toString("base64");
             codeList[basePath] = this.setFn(basePath, "\"" + contentB64 + "\"", false, platform);
             nktj_cli_1.CLI.outn(nktj_cli_1.CLI.setColor("# ", nktj_cli_1.Color.Green) + "mount coreres".padEnd(20) + " " + basePath);
+        });
+    }
+    static pluginResourceMount(rootDir, codeList, lib, platform) {
+        const targetPath = rootDir + "/node_modules/" + lib.libname + "/bin/res";
+        this.search(targetPath, (file) => {
+            const fullPath = file.path + "/" + file.name;
+            let basePath = "CORERES/" + lib.libname + "/" + fullPath.substring((targetPath + "/").length);
+            basePath = basePath.split("\\").join("/");
+            basePath = basePath.split("//").join("/");
+            const contentB64 = Buffer.from(fs.readFileSync(fullPath)).toString("base64");
+            codeList[basePath] = this.setFn(basePath, "\"" + contentB64 + "\"", false, platform);
+            nktj_cli_1.CLI.outn(nktj_cli_1.CLI.setColor("# ", nktj_cli_1.Color.Green) + "mount pluginres".padEnd(20) + " " + basePath);
         });
     }
     static localModuleMount(codeList, rootDir, platformName, platform) {
@@ -418,14 +471,19 @@ class Builder {
         return __awaiter(this, void 0, void 0, function* () {
             const libPath = rootDir + "/node_modules/mikeneko-corelib";
             const binPath = libPath + "/bin";
-            const distPath = libPath + "/dist";
+            const distPath = rootDir + "/dist";
             const outPath = rootDir + "/dist/corelib";
             if (!corelibtsc) {
                 if (fs.existsSync(outPath))
                     return;
             }
+            if (!fs.existsSync(distPath))
+                fs.mkdirSync(distPath);
+            if (!fs.existsSync(outPath))
+                fs.mkdirSync(outPath);
             let forceStr = "";
             nktj_cli_1.CLI.wait(nktj_cli_1.CLI.setColor("# ", nktj_cli_1.Color.Green) + forceStr + "TranceComplie (Core Library) ...");
+            fs.mkdirSync(outPath, { recursive: true });
             return new Promise((resolve, reject) => {
                 this.corelibDelete(outPath);
                 (0, child_process_1.exec)("cd " + binPath + " && tsc --outdir " + outPath + " --project tsconfigs/" + tsType + ".json", (error, stdout, stderr) => {
@@ -438,6 +496,38 @@ class Builder {
                         resolve(tsType);
                     }
                 });
+            });
+        });
+    }
+    static typescriptCompliePlugin(rootDir, tsType, corelibtsc, lib) {
+        const libPath = rootDir + "/node_modules/" + lib.libname;
+        const binPath = libPath + "/bin";
+        const distPath = rootDir + "/dist";
+        const pluginPath = distPath + "/plugins";
+        const outPath = pluginPath + "/" + lib.libname;
+        if (!corelibtsc) {
+            if (fs.existsSync(outPath))
+                return;
+        }
+        let forceStr = "";
+        nktj_cli_1.CLI.wait(nktj_cli_1.CLI.setColor("# ", nktj_cli_1.Color.Green) + forceStr + "TranceComplie (plugin = " + lib.libname + ") ...");
+        if (!fs.existsSync(distPath))
+            fs.mkdirSync(distPath);
+        if (!fs.existsSync(pluginPath))
+            fs.mkdirSync(pluginPath);
+        if (!fs.existsSync(outPath))
+            fs.mkdirSync(outPath);
+        return new Promise((resolve, reject) => {
+            this.corelibDelete(outPath);
+            (0, child_process_1.exec)("cd " + binPath + " && tsc --outdir " + outPath + " --project tsconfigs/" + tsType + ".json", (error, stdout, stderr) => {
+                if (error) {
+                    nktj_cli_1.CLI.waitClose(nktj_cli_1.CLI.setColor("NG", nktj_cli_1.Color.Red));
+                    reject(stdout);
+                }
+                else {
+                    nktj_cli_1.CLI.waitClose(nktj_cli_1.CLI.setColor("OK", nktj_cli_1.Color.Green));
+                    resolve(tsType);
+                }
             });
         });
     }
@@ -493,9 +583,9 @@ class Builder {
         }
         return tsType;
     }
-    static buildWebPack(rootDir, platformDir, tscType, platform, CoreLibList, platformOptionClass, buildhandle) {
+    static buildWebPack(rootDir, platformDir, tscType, platform, CoreLibList, pluginList, platformOptionClass, buildhandle) {
         return __awaiter(this, void 0, void 0, function* () {
-            this.setWebPackDist(rootDir, platformDir, tscType, CoreLibList);
+            this.setWebPackDist(rootDir, platformDir, tscType, CoreLibList, pluginList);
             this.setWebpackComponent(platformDir);
             try {
                 yield this.webPackExec(platform.name);
@@ -533,7 +623,7 @@ class Builder {
             });
         });
     }
-    static setWebPackDist(rootDir, platformDir, tscType, CoreLibList) {
+    static setWebPackDist(rootDir, platformDir, tscType, CoreLibList, pluginList) {
         if (!fs.existsSync(platformDir)) {
             nktj_cli_1.CLI.outn(nktj_cli_1.CLI.setColor("# ", nktj_cli_1.Color.Green) + "mkdir " + platformDir);
             fs.mkdirSync(platformDir);
@@ -560,6 +650,16 @@ class Builder {
             const coreName = CoreLibList[n];
             fs.copyFileSync(distLibPath + "/" + coreName + ".js", distDir + "/core/" + coreName + ".js");
         }
+        const pluginPath = rootDir + "/dist/plugins";
+        for (let n = 0; n < pluginList.length; n++) {
+            const plugin = pluginList[n];
+            const pluginName = plugin.libname;
+            for (let n2 = 0; n2 < plugin.list.length; n2++) {
+                const moduleName = plugin.list[n2];
+                const modulePath = pluginPath + "/" + pluginName + "/" + moduleName + ".js";
+                fs.copyFileSync(modulePath, distDir + "/core/" + moduleName + ".js");
+            }
+        }
         // CORERES set
         if (!fs.existsSync(distDir + "/CORERES")) {
             fs.mkdirSync(distDir + "/CORERES");
@@ -576,6 +676,28 @@ class Builder {
             }
             else {
                 fs.copyFileSync(fulll_, distDir + "/CORERES/" + l_);
+            }
+        }
+        for (let n = 0; n < pluginList.length; n++) {
+            const plugin = pluginList[n];
+            const pluginName = plugin.libname;
+            const pluginResPath = rootDir + "/node_modules/" + pluginName + "/bin/res";
+            const distPluginPath = distDir + "/CORERES/" + pluginName;
+            const coreresLIsts = fs.readdirSync(pluginResPath, { recursive: true });
+            for (let n = 0; n < coreresLIsts.length; n++) {
+                const l_ = coreresLIsts[n];
+                const fulll_ = pluginResPath + "/" + coreresLIsts[n];
+                if (!fs.existsSync(distPluginPath)) {
+                    fs.mkdirSync(distPluginPath);
+                }
+                if (fs.statSync(fulll_).isDirectory()) {
+                    if (!fs.existsSync(distPluginPath + "//" + l_)) {
+                        fs.mkdirSync(distPluginPath + "/" + l_);
+                    }
+                }
+                else {
+                    fs.copyFileSync(fulll_, distPluginPath + "/" + l_);
+                }
             }
         }
         // app list set
