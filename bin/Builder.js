@@ -282,7 +282,7 @@ class Builder {
         let content = fs.readFileSync(rootDir + "/dist/corelib/Front.js").toString();
         content = content.split("{{platform}}").join(platformName);
         if (!debugMode)
-            content += "console.log=()=>{};\n";
+            content += "console.log=()=>{};console.error=()=>{};\n";
         codeList.___HEADER = content;
     }
     static setFn(name, content, rawFlg, platform) {
