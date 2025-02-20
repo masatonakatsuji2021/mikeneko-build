@@ -47,7 +47,7 @@ class Builder {
                 }
             }
             let corelibTsc = false;
-            if (argsOption["corelibtsc"])
+            if (argsOption["corelibtsc"] || argsOption["force"])
                 corelibTsc = true;
             if (!option)
                 option = {};
@@ -329,7 +329,7 @@ class Builder {
             nktj_cli_1.CLI.outn(nktj_cli_1.CLI.setColor("# ", nktj_cli_1.Color.Green) + "mount plugin".padEnd(20) + " " + moduleName);
             let contents = fs.readFileSync(modulePath).toString();
             contents = "var exports = {};\n" + contents + ";\nreturn exports;";
-            codeList[lib.libname] = this.setFn(moduleName, contents, true, platform);
+            codeList[moduleName] = this.setFn(moduleName, contents, true, platform);
         }
     }
     static coreResourceMount(rootDir, codeList, platform) {
@@ -519,7 +519,7 @@ class Builder {
             fs.mkdirSync(outPath);
         return new Promise((resolve, reject) => {
             this.corelibDelete(outPath);
-            (0, child_process_1.exec)("cd " + binPath + " && tsc --outdir " + outPath + " --project tsconfigs/" + tsType + ".json", (error, stdout, stderr) => {
+            (0, child_process_1.exec)("cd " + binPath + " && tsc --project ../tsconfigs/" + tsType + ".json --outdir " + outPath, (error, stdout, stderr) => {
                 if (error) {
                     nktj_cli_1.CLI.waitClose(nktj_cli_1.CLI.setColor("NG", nktj_cli_1.Color.Red));
                     reject(stdout);

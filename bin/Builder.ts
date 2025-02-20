@@ -38,7 +38,7 @@ export class Builder {
         }
 
         let corelibTsc : boolean = false;
-        if (argsOption["corelibtsc"]) corelibTsc = true;
+        if (argsOption["corelibtsc"] || argsOption["force"]) corelibTsc = true;
 
         if (!option) option = {};
         if (option.platforms == undefined) option.platforms = [ { name: "web" } ];
@@ -356,7 +356,7 @@ export class Builder {
             CLI.outn(CLI.setColor("# ", Color.Green) + "mount plugin".padEnd(20) + " " + moduleName);
             let contents : string = fs.readFileSync(modulePath).toString() ;
             contents = "var exports = {};\n" + contents + ";\nreturn exports;";
-            codeList[lib.libname] = this.setFn(moduleName, contents, true, platform);
+            codeList[moduleName] = this.setFn(moduleName, contents, true, platform);
         }
     }
 
@@ -546,7 +546,7 @@ export class Builder {
         if (!fs.existsSync(outPath)) fs.mkdirSync(outPath);
         return new Promise((resolve, reject) => {
             this.corelibDelete(outPath);
-            exec("cd " + binPath + " && tsc --outdir " + outPath + " --project tsconfigs/" + tsType + ".json",(error, stdout, stderr)=>{
+            exec("cd " + binPath + " && tsc --project ../tsconfigs/" + tsType + ".json --outdir " + outPath,(error, stdout, stderr)=>{
                 if (error) {
                     CLI.waitClose(CLI.setColor("NG", Color.Red));
                     reject(stdout);
