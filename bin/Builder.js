@@ -28,6 +28,15 @@ class Builder {
      */
     static build(option) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (!option) {
+                try {
+                    option = require(process.cwd() + "/mikeneko.json");
+                }
+                catch (error) {
+                    nktj_cli_1.CLI.outn(nktj_cli_1.CLI.setColor(`[Build Error] Not found "mikeneko.json".`, nktj_cli_1.Color.Red));
+                    return;
+                }
+            }
             const argsOption = nktj_cli_1.CLI.getArgsOPtion();
             let platformnames = [];
             let selectPlatform;
@@ -682,6 +691,8 @@ class Builder {
             const plugin = pluginList[n];
             const pluginName = plugin.libname;
             const pluginResPath = rootDir + "/node_modules/" + pluginName + "/bin/res";
+            if (!fs.existsSync(pluginResPath))
+                continue;
             const distPluginPath = distDir + "/CORERES/" + pluginName;
             const coreresLIsts = fs.readdirSync(pluginResPath, { recursive: true });
             for (let n = 0; n < coreresLIsts.length; n++) {

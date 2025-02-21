@@ -18,6 +18,15 @@ export class Builder {
      * @returns 
      */
     public static async build(option? : BuildOption) {
+        if (!option) {
+            try {
+                option = require(process.cwd() + "/mikeneko.json");
+            } catch (error) {
+                CLI.outn(CLI.setColor(`[Build Error] Not found "mikeneko.json".`,Color.Red));
+                return;
+            }
+        }
+
         const argsOption = CLI.getArgsOPtion();
         let platformnames = [];
         let selectPlatform : string;
@@ -722,6 +731,7 @@ export class Builder {
             const plugin = pluginList[n];
             const pluginName = plugin.libname;
             const pluginResPath = rootDir + "/node_modules/" + pluginName + "/bin/res";
+            if (!fs.existsSync(pluginResPath)) continue;
             const distPluginPath = distDir + "/CORERES/" + pluginName;
             const coreresLIsts = fs.readdirSync(pluginResPath, { recursive : true });
             for (let n = 0 ; n < coreresLIsts.length ; n++){
