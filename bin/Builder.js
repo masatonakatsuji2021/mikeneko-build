@@ -495,7 +495,7 @@ class Builder {
             fs.mkdirSync(outPath, { recursive: true });
             return new Promise((resolve, reject) => {
                 this.corelibDelete(outPath);
-                (0, child_process_1.exec)("cd " + binPath + " && tsc --outdir " + outPath + " --project tsconfigs/" + tsType + ".json", (error, stdout, stderr) => {
+                (0, child_process_1.exec)("cd " + binPath + " && tsc --outdir " + outPath + " --project tsconfig.json --target " + tsType, (error, stdout, stderr) => {
                     if (error) {
                         nktj_cli_1.CLI.waitClose(nktj_cli_1.CLI.setColor("NG", nktj_cli_1.Color.Red));
                         reject(stdout);
@@ -528,7 +528,7 @@ class Builder {
             fs.mkdirSync(outPath);
         return new Promise((resolve, reject) => {
             this.corelibDelete(outPath);
-            (0, child_process_1.exec)("cd " + binPath + " && tsc --project ../tsconfigs/" + tsType + ".json --outdir " + outPath, (error, stdout, stderr) => {
+            (0, child_process_1.exec)("cd " + binPath + " && tsc --project tsconfig.json --target " + tsType + " --outdir " + outPath, (error, stdout, stderr) => {
                 if (error) {
                     nktj_cli_1.CLI.waitClose(nktj_cli_1.CLI.setColor("NG", nktj_cli_1.Color.Red));
                     reject(stdout);
@@ -588,6 +588,7 @@ class Builder {
             tsType = tsConfig.compilerOptions.target;
         }
         catch (error) {
+            nktj_cli_1.CLI.outn(nktj_cli_1.CLI.setColor("[wARM] " + error, nktj_cli_1.Color.Orange));
             return;
         }
         return tsType;

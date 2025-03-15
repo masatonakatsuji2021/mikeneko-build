@@ -526,7 +526,7 @@ export class Builder {
 
         return new Promise((resolve, reject) => {
             this.corelibDelete(outPath);
-            exec("cd " + binPath + " && tsc --outdir " + outPath + " --project tsconfigs/" + tsType + ".json",(error, stdout, stderr)=>{
+            exec("cd " + binPath + " && tsc --outdir " + outPath + " --project tsconfig.json --target " + tsType,(error, stdout, stderr)=>{
                 if (error) {
                     CLI.waitClose(CLI.setColor("NG", Color.Red));
                     reject(stdout);
@@ -555,7 +555,7 @@ export class Builder {
         if (!fs.existsSync(outPath)) fs.mkdirSync(outPath);
         return new Promise((resolve, reject) => {
             this.corelibDelete(outPath);
-            exec("cd " + binPath + " && tsc --project ../tsconfigs/" + tsType + ".json --outdir " + outPath,(error, stdout, stderr)=>{
+            exec("cd " + binPath + " && tsc --project tsconfig.json --target " + tsType + " --outdir " + outPath,(error, stdout, stderr)=>{
                 if (error) {
                     CLI.waitClose(CLI.setColor("NG", Color.Red));
                     reject(stdout);
@@ -617,6 +617,7 @@ export class Builder {
             if (!tsConfig.compilerOptions.target) return;
             tsType = tsConfig.compilerOptions.target;
         }catch(error){
+            CLI.outn(CLI.setColor("[wARM] " + error, Color.Orange));
             return;
         }
         return tsType;
