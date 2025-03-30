@@ -1,3 +1,5 @@
+import { Hook } from "bin/Hook";
+
 export enum BuildType {
 
     WebBuilder = "webBuilder",
@@ -71,6 +73,12 @@ export interface BuildPlatform {
      */
     mapping?: boolean,
 
+    /**
+     * ***hooks*** :  
+     */
+    hooks? : string | Array<string>,
+
+    hookClass? : Array<Hook>,
 }
 
 export interface BuildOption {

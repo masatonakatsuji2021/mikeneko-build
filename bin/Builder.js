@@ -17,7 +17,6 @@ const UglifyJS = require("uglify-js");
 const strip = require("strip-comments");
 const child_process_1 = require("child_process");
 const obfucator = require("javascript-obfuscator");
-const BuildHandle_1 = require("./BuildHandle");
 const BuildOption_1 = require("./BuildOption");
 const nktj_cli_1 = require("nktj_cli");
 class Builder {
@@ -52,6 +51,21 @@ class Builder {
                 if (selectPlatform) {
                     if (platform.name != selectPlatform) {
                         platform.disable = true;
+                    }
+                }
+                if (platform.hooks) {
+                    if (typeof platform.hooks == "string")
+                        platform.hooks = [platform.hooks];
+                    platform.hookClass = [];
+                    for (let n = 0; n < platform.hooks.length; n++) {
+                        const hookPath = platform.hooks[n];
+                        try {
+                            platform.hookClass.push(require(process.cwd() + "/" + hookPath));
+                        }
+                        catch (error) {
+                            console.error(error);
+                            return;
+                        }
                     }
                 }
             }
@@ -153,48 +167,26 @@ class Builder {
                     platform.build = BuildOption_1.BuildType.WebBuilder;
                 if (!platform.buildType)
                     platform.buildType = BuildOption_1.BuildPlatformType.Web;
-                let platformOptionClass;
-                try {
-                    const pbName = "Platform" + platform.buildType.substring(0, 1).toUpperCase() + platform.buildType.substring(1);
-                    const pbModuleName = "mikeneko-platform-" + platform.buildType;
-                    const pbPath = require.resolve(pbModuleName);
-                    const pb_ = require(pbModuleName);
-                    if (pb_[pbName]) {
-                        platformOptionClass = pb_[pbName];
-                        platformOptionClass.__dirname = pbPath;
-                    }
-                }
-                catch (error) { }
-                if (platformOptionClass) {
-                    const p_ = platformOptionClass.handleBuildBegin(platform);
-                    if (p_)
-                        platform = p_;
-                }
-                let buildhandle = BuildHandle_1.BuildHandle;
-                try {
-                    buildhandle = require(rootDir + "/src/BuildHandle").BuildHandle;
-                }
-                catch (error) { }
-                if (!buildhandle) {
-                    try {
-                        buildhandle = require(rootDir + "/src_" + platform.name + "/BuildHandle").BuildHandle;
-                    }
-                    catch (error) { }
-                }
                 nktj_cli_1.CLI.outn(nktj_cli_1.CLI.setColor("# ", nktj_cli_1.Color.Green) + "platform = " + platform.name + ", buildType = " + platform.buildType);
                 // create platform directory
                 let platformDir = buildDir + "/" + platform.name;
                 if (platform.optionDir)
                     platformDir += "/" + platform.optionDir;
                 if (platform.build == BuildOption_1.BuildType.webpack) {
-                    this.buildWebPack(rootDir, platformDir, tsType, platform, CoreLibList, pluginList, platformOptionClass, buildhandle);
+                    this.buildWebPack(rootDir, platformDir, tsType, platform, CoreLibList, pluginList);
                     return;
+                }
+                if (platform.hookClass) {
+                    for (let n2 = 0; n2 < platform.hookClass.length; n2++) {
+                        const hook = platform.hookClass[n2];
+                        if (!hook.begin)
+                            continue;
+                        hook.begin();
+                    }
                 }
                 this.outMkdir(platformDir, true);
                 platform.outPath = platformDir;
                 platform.path = buildDir + "/" + platform.name;
-                // build handle begin
-                buildhandle.handleBegin(platform);
                 // code set
                 let codeList = {};
                 // start head
@@ -211,18 +203,6 @@ class Builder {
                 pluginList.forEach(lib => {
                     this.pluginModuleMount(rootDir, codeList, tsType, lib, platform);
                 });
-                if (platformOptionClass) {
-                    const addModule = (name, modulePath) => {
-                        if (!modulePath)
-                            modulePath = name;
-                        console.log("# core module mount".padEnd(20) + " " + name);
-                        const fullPath = path.dirname(platformOptionClass.__dirname) + "/dist/" + tsType + "/" + modulePath + ".js";
-                        let contents = fs.readFileSync(fullPath).toString();
-                        contents = "var exports = {};\n" + contents + ";\nreturn exports;";
-                        codeList[name] = this.setFn(name, contents, true, platform);
-                    };
-                    platformOptionClass.handleCoreModuleMount(addModule);
-                }
                 // core resource mount
                 this.coreResourceMount(rootDir, codeList, platform);
                 // plugin resource mount
@@ -251,22 +231,40 @@ class Builder {
                 if (obfuscated)
                     coreStr = this.codeObfuscate(coreStr);
                 nktj_cli_1.CLI.outn(nktj_cli_1.CLI.setColor("# ", nktj_cli_1.Color.Green) + "write index.js");
+                if (platform.hookClass) {
+                    for (let n2 = 0; n2 < platform.hookClass.length; n2++) {
+                        const hook = platform.hookClass[n2];
+                        if (!hook.setIndexJS)
+                            continue;
+                        const buffer = hook.setIndexJS(coreStr);
+                        if (buffer)
+                            coreStr = buffer;
+                    }
+                }
                 fs.writeFileSync(platformDir + "/index.js", coreStr);
                 nktj_cli_1.CLI.outn(nktj_cli_1.CLI.setColor("# ", nktj_cli_1.Color.Green) + "write index.html");
                 let indexHTML = "<!DOCTYPE html><head><meta charset=\"UTF-8\"><script src=\"index.js\"></script></head><body></body></html>";
-                if (platformOptionClass) {
-                    const htmlBuffer = platformOptionClass.handleCreateIndexHTML();
-                    if (htmlBuffer)
-                        indexHTML = htmlBuffer;
+                if (platform.hookClass) {
+                    for (let n2 = 0; n2 < platform.hookClass.length; n2++) {
+                        const hook = platform.hookClass[n2];
+                        if (!hook.setIndexHTML)
+                            continue;
+                        const buffer = hook.setIndexHTML(indexHTML);
+                        if (buffer)
+                            indexHTML = buffer;
+                    }
                 }
                 fs.writeFileSync(platformDir + "/index.html", indexHTML);
                 nktj_cli_1.CLI.outn(nktj_cli_1.CLI.setColor("# ", nktj_cli_1.Color.Green) + "Web Build Comlete.");
-                if (platformOptionClass) {
-                    platformOptionClass.handleWebBuildCompleted(platform);
-                }
                 nktj_cli_1.CLI.outn(nktj_cli_1.CLI.setColor("# ", nktj_cli_1.Color.Green) + "........ platform = " + platform.name + " ok");
-                // build handle platform  complete
-                buildhandle.handleComplete(platform);
+                if (platform.hookClass) {
+                    for (let n2 = 0; n2 < platform.hookClass.length; n2++) {
+                        const hook = platform.hookClass[n2];
+                        if (!hook.complete)
+                            continue;
+                        hook.complete();
+                    }
+                }
             }
             nktj_cli_1.CLI.br().outn("...... Complete!", nktj_cli_1.Color.Green);
         });
@@ -593,7 +591,7 @@ class Builder {
         }
         return tsType;
     }
-    static buildWebPack(rootDir, platformDir, tscType, platform, CoreLibList, pluginList, platformOptionClass, buildhandle) {
+    static buildWebPack(rootDir, platformDir, tscType, platform, CoreLibList, pluginList) {
         return __awaiter(this, void 0, void 0, function* () {
             this.setWebPackDist(rootDir, platformDir, tscType, CoreLibList, pluginList);
             this.setWebpackComponent(platformDir);
@@ -608,11 +606,6 @@ class Builder {
             }
             nktj_cli_1.CLI.outn(nktj_cli_1.CLI.setColor("# ", nktj_cli_1.Color.Green) + "write index.html");
             let indexHTML = "<!DOCTYPE html><head><meta charset=\"UTF-8\"><script src=\"index.js\"></script></head><body></body></html>";
-            if (platformOptionClass) {
-                const htmlBuffer = platformOptionClass.handleCreateIndexHTML();
-                if (htmlBuffer)
-                    indexHTML = htmlBuffer;
-            }
             fs.writeFileSync(platformDir + "/www/index.html", indexHTML);
             nktj_cli_1.CLI.br().outn("...... Complete!", nktj_cli_1.Color.Green);
         });

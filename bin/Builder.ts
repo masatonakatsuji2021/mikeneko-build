@@ -5,8 +5,6 @@ import * as UglifyJS  from "uglify-js";
 import * as strip from "strip-comments";
 import { exec } from "child_process";
 import * as obfucator from "javascript-obfuscator";
-import { BuildHandle } from "./BuildHandle";
-import { PlatformBase } from "./PlatformBase";
 import { BuildOption, BuildPlatform, BuildPlatformType, BuildType } from "./BuildOption";
 import { CLI, Color } from "nktj_cli";
 
@@ -42,7 +40,20 @@ export class Builder {
             if (selectPlatform) {
                 if (platform.name != selectPlatform) {
                     platform.disable = true;
-                }    
+                }
+            }
+            if (platform.hooks) {
+                if (typeof platform.hooks == "string") platform.hooks = [ platform.hooks ];
+                platform.hookClass = [];
+                for(let n = 0 ; n < platform.hooks.length ; n++) {
+                    const hookPath = platform.hooks[n];
+                    try {
+                        platform.hookClass.push(require(process.cwd() + "/" + hookPath));
+                    } catch (error) {
+                        console.error(error);
+                        return;
+                    }    
+                }
             }
         }
 
@@ -149,33 +160,6 @@ export class Builder {
 
             if (!platform.buildType) platform.buildType = BuildPlatformType.Web;
 
-            let platformOptionClass : typeof PlatformBase;
-            try {
-                const pbName = "Platform" + platform.buildType.substring(0,1).toUpperCase() + platform.buildType.substring(1);
-                const pbModuleName = "mikeneko-platform-" + platform.buildType;
-                const pbPath = require.resolve(pbModuleName);
-                const pb_ = require(pbModuleName);
-                if (pb_[pbName]) {
-                    platformOptionClass = pb_[pbName];
-                    platformOptionClass.__dirname = pbPath;
-                }
-            } catch(error) { }
-
-            if (platformOptionClass) {
-                const p_ = platformOptionClass.handleBuildBegin(platform);
-                if (p_) platform = p_;
-            }
-
-            let buildhandle : typeof BuildHandle = BuildHandle;
-            try {
-                buildhandle = require(rootDir + "/src/BuildHandle").BuildHandle;
-            }catch(error){}
-            if (!buildhandle) {
-                try {
-                    buildhandle = require(rootDir + "/src_" + platform.name + "/BuildHandle").BuildHandle;
-                }catch(error){}    
-            }
-            
             CLI.outn(CLI.setColor("# ", Color.Green) + "platform = " + platform.name + ", buildType = " + platform.buildType);
           
             // create platform directory
@@ -189,18 +173,22 @@ export class Builder {
                     tsType, 
                     platform, 
                     CoreLibList,
-                    pluginList,
-                    platformOptionClass, buildhandle);
+                    pluginList);
                 return;
             }
 
+            if (platform.hookClass) {
+                for(let n2 = 0 ; n2 < platform.hookClass.length ; n2++) {
+                    const hook = platform.hookClass[n2];
+                    if (!hook.begin) continue;
+                    hook.begin();
+                }
+            }
+    
             this.outMkdir(platformDir, true);
 
             platform.outPath = platformDir;
             platform.path = buildDir + "/" + platform.name;
-
-            // build handle begin
-            buildhandle.handleBegin(platform);
 
             // code set
             let codeList : {[name : string] : string} = {};
@@ -220,18 +208,6 @@ export class Builder {
             pluginList.forEach(lib => {
                 this.pluginModuleMount(rootDir, codeList, tsType, lib, platform);
             });
-
-            if (platformOptionClass) {
-                const addModule = (name : string, modulePath? : string) => {
-                    if (!modulePath) modulePath = name;
-                    console.log("# core module mount".padEnd(20) + " " + name);
-                    const fullPath : string = path.dirname(platformOptionClass.__dirname) + "/dist/" + tsType + "/" + modulePath + ".js"; 
-                    let contents : string = fs.readFileSync(fullPath).toString() ;
-                    contents = "var exports = {};\n" + contents + ";\nreturn exports;";
-                    codeList[name] = this.setFn(name, contents, true, platform);
-                };
-                platformOptionClass.handleCoreModuleMount(addModule);
-             }
 
             // core resource mount
             this.coreResourceMount(rootDir, codeList, platform);
@@ -266,26 +242,41 @@ export class Builder {
             if (obfuscated) coreStr = this.codeObfuscate(coreStr);
             
             CLI.outn(CLI.setColor("# ", Color.Green) + "write index.js");
+            if (platform.hookClass) {
+                for(let n2 = 0 ; n2 < platform.hookClass.length ; n2++) {
+                    const hook = platform.hookClass[n2];
+                    if (!hook.setIndexJS) continue;
+                    const buffer = hook.setIndexJS(coreStr);
+                    if (buffer) coreStr = buffer;
+                }
+            }
+
             fs.writeFileSync(platformDir + "/index.js", coreStr);
     
             CLI.outn(CLI.setColor("# ", Color.Green) + "write index.html");
             let indexHTML : string = "<!DOCTYPE html><head><meta charset=\"UTF-8\"><script src=\"index.js\"></script></head><body></body></html>";
-            if (platformOptionClass) {
-                const htmlBuffer = platformOptionClass.handleCreateIndexHTML();
-                if (htmlBuffer) indexHTML = htmlBuffer;
+
+            if (platform.hookClass) {
+                for(let n2 = 0 ; n2 < platform.hookClass.length ; n2++) {
+                    const hook = platform.hookClass[n2];
+                    if (!hook.setIndexHTML) continue;
+                    const buffer = hook.setIndexHTML(indexHTML);
+                    if (buffer) indexHTML = buffer;
+                }
             }
+
             fs.writeFileSync(platformDir + "/index.html", indexHTML);
     
             CLI.outn(CLI.setColor("# ", Color.Green) + "Web Build Comlete.");
-
-            if (platformOptionClass) {
-                platformOptionClass.handleWebBuildCompleted(platform);
-            }
-
             CLI.outn(CLI.setColor("# ", Color.Green) + "........ platform = " + platform.name + " ok");
 
-            // build handle platform  complete
-            buildhandle.handleComplete(platform);
+            if (platform.hookClass) {
+                for(let n2 = 0 ; n2 < platform.hookClass.length ; n2++) {
+                    const hook = platform.hookClass[n2];
+                    if (!hook.complete) continue;
+                    hook.complete();
+                }
+            }
         }
 
         CLI.br().outn("...... Complete!", Color.Green);
@@ -623,7 +614,7 @@ export class Builder {
         return tsType;
     }
 
-    private static async buildWebPack(rootDir: string, platformDir : string, tscType : string, platform : BuildPlatform, CoreLibList: Array<string>, pluginList : Array<{libname: string, list: Array<string> }>, platformOptionClass : typeof PlatformBase, buildhandle : typeof BuildHandle) {
+    private static async buildWebPack(rootDir: string, platformDir : string, tscType : string, platform : BuildPlatform, CoreLibList: Array<string>, pluginList : Array<{libname: string, list: Array<string> }>) {
 
         this.setWebPackDist(rootDir, platformDir, tscType, CoreLibList, pluginList);
 
@@ -640,10 +631,6 @@ export class Builder {
 
         CLI.outn(CLI.setColor("# ", Color.Green) + "write index.html");
         let indexHTML : string = "<!DOCTYPE html><head><meta charset=\"UTF-8\"><script src=\"index.js\"></script></head><body></body></html>";
-        if (platformOptionClass) {
-            const htmlBuffer = platformOptionClass.handleCreateIndexHTML();
-            if (htmlBuffer) indexHTML = htmlBuffer;
-        }
         fs.writeFileSync(platformDir + "/www/index.html", indexHTML);
 
         CLI.br().outn("...... Complete!", Color.Green);
